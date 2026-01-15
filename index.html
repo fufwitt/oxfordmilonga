@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Oxford Milonga - Editor</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+:root {
+  --bg: #141016;
+  --panel: #1f1824;
+  --accent: #b06aa9;
+  --accent-soft: #d6a3cf;
+  --text: #f2edf3;
+  --muted: #b7aebc;
+}
+
+body {
+  margin:0;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.container { max-width: 680px; margin:auto; padding:1rem; }
+.card { background: var(--panel); border-radius:10px; padding:0.9rem 1rem; margin-bottom:0.7rem; cursor:pointer; }
+.card strong { color: var(--accent-soft); }
+.next { border-left: 4px solid var(--accent); }
+.notice { background:#2a1a2d; border-left:4px solid var(--accent); }
+a { color: var(--accent-soft); text-decoration:none; }
+a:hover { text-decoration:underline; }
+footer { text-align:center; color: var(--muted); font-size:0.8rem; padding:1rem 0 1.5rem; }
+
+.editor-panel { display:flex; margin-top:1rem; gap:1rem; }
+.section-list { flex:1; background:var(--panel); padding:0.5rem; border-radius:8px; max-height:400px; overflow:auto; }
+.section-list div { padding:0.3rem; cursor:pointer; border-radius:4px; margin-bottom:0.2rem; }
+.section-list div:hover { background: var(--accent-soft); color: #000; }
+.editor-area { flex:2; }
+#editor-text { width:100%; min-height:250px; }
+
+button { margin-top:0.5rem; padding:0.3rem 0.6rem; cursor:pointer; border:none; border-radius:4px; background:var(--accent); color:#fff; }
+
+.login-panel { margin-bottom:1rem; }
+.login-panel input { padding:0.3rem; margin-right:0.3rem; border-radius:4px; border:none; width:150px; }
+</style>
+
+<link rel="stylesheet" href="https://unpkg.com/easymde/dist/easymde.min.css">
+
+</head>
+<body>
+
+<img src="https://user.fm/files/v2-058096dbaec77a53d080b2e23ab74ff6/OMheader1.jpg" alt="Oxford Milonga" class="header-img">
+<div class="container">
+
+  <!-- Public display -->
+  <div id="content-container">
+    <div class="card next" id="next-milonga"></div>
+    <div class="card" id="dates"></div>
+    <div class="card notice" id="traffic-note"></div>
+    <div class="card" id="venue"></div>
+    <div class="card" id="parking"></div>
+    <div class="card" id="thanks"></div>
+    <div class="card" id="etiquette"></div>
+    <div class="card" id="contact"></div>
+  </div>
+  <footer id="footer"></footer>
+
+  <hr>
+
+  <!-- Login -->
+  <div id="login-panel" class="login-panel">
+    <input id="email" placeholder="email">
+    <input id="password" type="password" placeholder="password">
+    <button onclick="login()">Login</button>
+  </div>
+
+  <!-- Editor mini CMS -->
+  <div id="editor" style="display:none" class="editor-panel">
+    <div class="section-list" id="section-list"></div>
+    <div class="editor-area">
+      <button onclick="togglePreview()">Toggle Preview</button>
+      <textarea id="editor-text"></textarea><br>
+      <button onclick="save()">Save</button>
+    </div>
+  </div>
+
+</div>
+
+<script src="https://unpkg.com/easymde/dist/easymde.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.3/dist/purify.min.js"></script>
+<script type="module">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// Supabase setup
+const supabase = createClient("https://YOUR_PROJECT_ID.supabase.co", "YOUR_PUBLIC_ANON_KEY");
+
+// Sections with pre-filled Markdown
+const sections = [
+  {id:"next-milonga", key:"nextMilonga", content:"**Next Milonga**\nFri 30 Jan 2026 · 8:00–11:15\nDoors 7:45 · £12 / £10"},
+  {id:"dates", key:"dates", content:"**2026 Dates**\nLast Friday of the month (except Aug / Nov* / Dec)\n* hall unavailable"},
+  {id:"traffic-note", key:"trafficNote", content:"**Traffic note**\nNew Oxford congestion cameras: if you drive in from bypass along Botley Road as normal there are no congestion cameras!"},
+  {id:"venue", key:"venue", content:"**Venue**\nWest Oxford Community Centre\nBotley Road · OX2 0BT"},
+  {id:"parking", key:"parking", content:"**Getting to us & Parking**\nClosest parking spaces: on-site (limited) and on Ferry Hinksey Road (Oatlands Road Recreation Ground car park and roadside).\nAdditional parking and transport info: [PDF](parking-PDF)"},
+  {id:"thanks", key:"thanks", content:"**We thank those who help**\nComing a bit early to help set up and staying to clear up increases dance time in our limited hall time."},
+  {id:"etiquette", key:"etiquette", content:"**Etiquette**\nCabeceo · Line of dance"},
+  {id:"contact", key:"contact", content:"**Contact & Social**\n[oxfordmilonga@gmail.com](mailto:oxfordmilonga@gmail.com)\n[Facebook Group](https://www.facebook.com/groups/919912082056800/)"},
+  {id:"footer", key:"footer", content:"Community-run · Respectful dancing · Help set up & clear up"}
+];
+
+let currentSection = null;
+const editor = new EasyMDE({ element: document.getElementById("editor-text") });
+let previewOn = true;
+
+// Render Markdown safely
+function renderSection(sec, markdown){
+  document.getElementById(sec.id).innerHTML = DOMPurify.sanitize(marked.parse(markdown));
+}
+
+// Load content from Supabase or fallback to pre-fill
+async function load() {
+  for(const sec of sections){
+    let md = sec.content;
+    try{
+      const { data } = await supabase.from("content").select(sec.key).eq("id",1).single();
+      if(data && data[sec.key]) md = data[sec.key];
+    } catch(e){}
+    renderSection(sec, md);
+  }
+}
+
+// Build section list for mini CMS
+function buildSectionList(){
+  const list = document.getElementById("section-list");
+  list.innerHTML="";
+  sections.forEach(sec=>{
+    const div = document.createElement("div");
+    div.innerText = sec.key;
+    div.onclick = async ()=>{
+      currentSection=sec;
+      const { data } = await supabase.from("content").select(sec.key).eq("id",1).single();
+      editor.value(data && data[sec.key] ? data[sec.key] : sec.content);
+    };
+    list.appendChild(div);
+  });
+}
+
+// Toggle preview
+window.togglePreview = ()=>{ editor.togglePreview(); }
+
+// Login
+window.login = async ()=>{
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  const { error } = await supabase.auth.signInWithPassword({email,password});
+  if(!error){
+    document.getElementById("login-panel").style.display="none";
+    document.getElementById("editor").style.display="flex";
+    buildSectionList();
+    currentSection=sections[0];
+    const { data } = await supabase.from("content").select(currentSection.key).eq("id",1).single();
+    editor.value(data && data[currentSection.key]?data[currentSection.key]:currentSection.content);
+  }else{ alert(error.message); }
+}
+
+// Save content
+window.save = async ()=>{
+  if(!currentSection) return;
+  await supabase.from("content").update({[currentSection.key]:editor.value()}).eq("id",1);
+  load();
+}
+
+// Keep login state
+supabase.auth.onAuthStateChange((_e, session)=>{
+  if(session){
+    document.getElementById("login-panel").style.display="none";
+    document.getElementById("editor").style.display="flex";
+    buildSectionList();
+  }
+});
+
+// Initial load
+load();
+
+</script>
+
+</body>
+</html>
+
