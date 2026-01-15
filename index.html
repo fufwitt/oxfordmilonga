@@ -84,6 +84,8 @@ footer {
 
 #login-area { text-align: center; margin: 1rem 0; }
 #login-area button { margin: 0 0.5rem; padding: 0.3rem 0.6rem; font-size: 14px; }
+
+#save-btn { display: none; margin-top: 1rem; padding: 0.3rem 0.6rem; font-size: 14px; background: var(--accent); color: #fff; border: none; border-radius: 5px; cursor: pointer; }
 </style>
 </head>
 
@@ -94,6 +96,7 @@ footer {
 <div id="login-area">
   <button id="login-btn">Log In</button>
   <button id="logout-btn" style="display:none;">Log Out</button>
+  <button id="save-btn">Save Changes</button>
 </div>
 
 <div class="container">
@@ -118,6 +121,10 @@ footer {
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ydXplbm9pdWtjbnNrZHBhcndnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0ODUxMTYsImV4cCI6MjA4NDA2MTExNn0.cQBPQyOmd4dj1enLtvrN9WFfDyTdCZJmS__BQqpjy9c";
   const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+  const loginBtn = document.getElementById("login-btn");
+  const logoutBtn = document.getElementById("logout-btn");
+  const saveBtn = document.getElementById("save-btn");
+
   // --- Load content ---
   async function loadContent() {
     const { data, error } = await supabase
@@ -138,9 +145,6 @@ footer {
   loadContent();
 
   // --- Login/logout ---
-  const loginBtn = document.getElementById("login-btn");
-  const logoutBtn = document.getElementById("logout-btn");
-
   supabase.auth.getSession().then(({ data }) => {
     if (data.session) showEditor();
   });
@@ -158,8 +162,10 @@ footer {
     hideEditor();
     loginBtn.style.display = "inline-block";
     logoutBtn.style.display = "none";
+    saveBtn.style.display = "none";
   };
 
+  // --- Editor functions ---
   function showEditor() {
     document.querySelectorAll("[data-field]").forEach(el => {
       el.setAttribute("contenteditable", "true");
@@ -168,6 +174,7 @@ footer {
     });
     loginBtn.style.display = "none";
     logoutBtn.style.display = "inline-block";
+    saveBtn.style.display = "inline-block";
   }
 
   function hideEditor() {
@@ -177,8 +184,30 @@ footer {
       el.style.padding = "";
     });
   }
+
+  // --- Save changes ---
+  saveBtn.onclick = async () => {
+    const updates = {};
+    document.querySelectorAll("[data-field]").forEach(el => {
+      updates[el.dataset.field] = el.innerHTML;
+    });
+    updates.footer = document.getElementById("footer").innerHTML;
+
+    const { data, error } = await supabase
+      .from("content")
+      .update(updates)
+      .eq("id", 1); // assuming your content row has id = 1
+
+    if (error) {
+      alert("Error saving changes: " + error.message);
+      console.error(error);
+    } else {
+      alert("Changes saved successfully!");
+    }
+  };
 </script>
 
 </body>
 </html>
+
 
