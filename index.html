@@ -76,19 +76,14 @@ footer {
   padding: 1rem 0 1.5rem;
 }
 
-/* Responsive adjustments */
 @media (max-width: 480px) {
-  body {
-    font-size: 14px;
-  }
-  .container {
-    padding: 0.8rem;
-  }
-  .card {
-    padding: 0.7rem 0.9rem;
-    margin-bottom: 0.5rem;
-  }
+  body { font-size: 14px; }
+  .container { padding: 0.8rem; }
+  .card { padding: 0.7rem 0.9rem; margin-bottom: 0.5rem; }
 }
+
+#login-area { text-align: center; margin: 1rem 0; }
+#login-area button { margin: 0 0.5rem; padding: 0.3rem 0.6rem; font-size: 14px; }
 </style>
 </head>
 
@@ -96,8 +91,12 @@ footer {
 
 <img src="https://user.fm/files/v2-058096dbaec77a53d080b2e23ab74ff6/OMheader1.jpg" alt="Oxford Milonga" class="header-img">
 
-<div class="container">
+<div id="login-area">
+  <button id="login-btn">Log In</button>
+  <button id="logout-btn" style="display:none;">Log Out</button>
+</div>
 
+<div class="container">
   <div class="card next" data-field="nextMilonga"></div>
   <div class="card" data-field="dates"></div>
   <div class="card notice" data-field="trafficNote"></div>
@@ -106,7 +105,6 @@ footer {
   <div class="card" data-field="thanks"></div>
   <div class="card" data-field="etiquette"></div>
   <div class="card" data-field="contact"></div>
-
 </div>
 
 <footer id="footer"></footer>
@@ -115,34 +113,72 @@ footer {
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/supabase.min.js"></script>
 
 <script>
-  // --- Step 1: Initialize Supabase ---
-  const SUPABASE_URL = "YOUR_SUPABASE_URL"; https://nruzenoiukcnskdparwg.supabase.com
-  const SUPABASE_ANON_KEY = "YOUR_ANON_KEY";eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ydXplbm9pdWtjbnNrZHBhcndnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0ODUxMTYsImV4cCI6MjA4NDA2MTExNn0.cQBPQyOmd4dj1enLtvrN9WFfDyTdCZJmS__BQqpjy9c
+  // --- Initialize Supabase ---
+  const SUPABASE_URL = "https://nruzenoiukcnskdparwg.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ydXplbm9pdWtjbnNrZHBhcndnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0ODUxMTYsImV4cCI6MjA4NDA2MTExNn0.cQBPQyOmd4dj1enLtvrN9WFfDyTdCZJmS__BQqpjy9c";
   const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // --- Step 2: Load content ---
+  // --- Load content ---
   async function loadContent() {
     const { data, error } = await supabase
       .from("content")
       .select("*")
       .single();
 
-    if (error) {
-      console.error("Error loading content:", error);
-      return;
-    }
+    if (error) { console.error("Error loading content:", error); return; }
 
     document.querySelectorAll("[data-field]").forEach(el => {
       const key = el.dataset.field;
       el.innerHTML = data[key] || "";
     });
 
-    // footer separately
     document.getElementById("footer").innerHTML = data.footer || "";
   }
 
   loadContent();
+
+  // --- Login/logout ---
+  const loginBtn = document.getElementById("login-btn");
+  const logoutBtn = document.getElementById("logout-btn");
+
+  supabase.auth.getSession().then(({ data }) => {
+    if (data.session) showEditor();
+  });
+
+  loginBtn.onclick = async () => {
+    const email = prompt("Enter your email:");
+    if (!email) return;
+    const { error } = await supabase.auth.signInWithOtp({ email });
+    if (error) return alert(error.message);
+    alert("Check your email for the login link.");
+  };
+
+  logoutBtn.onclick = async () => {
+    await supabase.auth.signOut();
+    hideEditor();
+    loginBtn.style.display = "inline-block";
+    logoutBtn.style.display = "none";
+  };
+
+  function showEditor() {
+    document.querySelectorAll("[data-field]").forEach(el => {
+      el.setAttribute("contenteditable", "true");
+      el.style.border = "1px dashed var(--accent-soft)";
+      el.style.padding = "0.5rem";
+    });
+    loginBtn.style.display = "none";
+    logoutBtn.style.display = "inline-block";
+  }
+
+  function hideEditor() {
+    document.querySelectorAll("[data-field]").forEach(el => {
+      el.removeAttribute("contenteditable");
+      el.style.border = "";
+      el.style.padding = "";
+    });
+  }
 </script>
 
 </body>
 </html>
+
